@@ -8,7 +8,7 @@ Tododo adalah aplikasi desktop manajemen tugas terpadu dengan kalender yang sang
   </a>
 </p>
 
-> **Catatan Download:** Tombol di atas akan langsung mengunduh installer terbaru dari release repo ini. Pastikan asset release memakai nama file `Tododo Setup 1.0.1.exe`.
+
 
 ---
 
