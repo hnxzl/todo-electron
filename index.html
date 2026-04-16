@@ -1,0 +1,879 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; script-src 'self'; connect-src https://libur.deno.dev;"
+    />
+    <title>Tododo v1.0.1 — Kalender Task Manager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <!-- ===== TITLE BAR ===== -->
+    <header class="title-bar" id="titleBar">
+      <div class="title-bar__left">
+        <div class="app-logo">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none">
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="18"
+              rx="3"
+              stroke="rgba(255,255,255,0.85)"
+              stroke-width="2"
+              fill="rgba(255,255,255,0.15)"
+            />
+            <path
+              d="M3 9H21"
+              stroke="rgba(255,255,255,0.85)"
+              stroke-width="2"
+            />
+            <path
+              d="M8 2V6M16 2V6"
+              stroke="rgba(255,255,255,0.85)"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <rect
+              x="7"
+              y="13"
+              width="4"
+              height="4"
+              rx="1"
+              fill="rgba(255,255,255,0.7)"
+            />
+          </svg>
+        </div>
+        <span class="app-title"
+          >Tododo <span class="app-version">v1.0.1</span></span
+        >
+      </div>
+      <div class="title-bar__controls">
+        <!-- Settings button -->
+        <button
+          class="ctrl-btn ctrl-btn--settings"
+          id="btnSettings"
+          title="Pengaturan"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <circle
+              cx="12"
+              cy="12"
+              r="3"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <path
+              d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          class="ctrl-btn ctrl-btn--pin"
+          id="btnPin"
+          title="Selalu di Atas"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M12 2L12 14M8 6L12 2L16 6M6 22L12 14L18 22"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+          </svg>
+        </button>
+        <button
+          class="ctrl-btn ctrl-btn--minimize"
+          id="btnMinimize"
+          title="Minimalkan ke tray"
+        >
+          <svg width="12" height="2" viewBox="0 0 12 2" fill="none">
+            <line
+              x1="0"
+              y1="1"
+              x2="12"
+              y2="1"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+        <button
+          class="ctrl-btn ctrl-btn--close"
+          id="btnClose"
+          title="Sembunyikan ke tray"
+        >
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+            <line
+              x1="1"
+              y1="1"
+              x2="10"
+              y2="10"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <line
+              x1="10"
+              y1="1"
+              x2="1"
+              y2="10"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ===== TOOLBAR ===== -->
+    <div class="toolbar">
+      <!-- View Switcher -->
+      <div class="view-switcher" role="group" aria-label="Pilih tampilan">
+        <button
+          class="view-btn is-active"
+          id="btnViewMonthly"
+          data-view="monthly"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="18"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <path
+              d="M3 9H21M9 4V9M15 4V9"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+          </svg>
+          Bulanan
+        </button>
+        <button class="view-btn" id="btnViewWeekly" data-view="weekly">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <rect
+              x="3"
+              y="4"
+              width="18"
+              height="18"
+              rx="2"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+            <path
+              d="M3 9H21M3 14H21M8 9V22M16 9V22"
+              stroke="currentColor"
+              stroke-width="2"
+            />
+          </svg>
+          Mingguan
+        </button>
+        <button class="view-btn" id="btnViewAgenda" data-view="agenda">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M8 6H21M8 12H21M8 18H21M3 6h.01M3 12h.01M3 18h.01"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+          </svg>
+          Agenda
+        </button>
+      </div>
+
+      <!-- Quick Input -->
+      <div class="quick-input-wrap">
+        <svg
+          class="quick-input-icon"
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+        >
+          <circle
+            cx="11"
+            cy="11"
+            r="7"
+            stroke="currentColor"
+            stroke-width="2"
+          />
+          <path
+            d="M20 20L16.5 16.5"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+          />
+        </svg>
+        <input
+          type="text"
+          id="quickInput"
+          class="quick-input"
+          placeholder="Tambah task cepat... cth: Meeting #work !high @besok  |  Batching: pisah dengan titik koma (;) atau paste multi-baris"
+          autocomplete="off"
+          maxlength="200"
+        />
+        <button class="quick-add-btn" id="btnQuickAdd">Tambah</button>
+        <!-- Tombol bantuan format -->
+        <div class="quick-help-wrap">
+          <button
+            class="quick-help-btn"
+            id="btnQuickHelp"
+            title="Panduan format quick input"
+            aria-label="Panduan format"
+          >
+            ?
+          </button>
+          <div
+            class="quick-help-tooltip"
+            id="quickHelpTooltip"
+            hidden
+            role="tooltip"
+          >
+            <div class="qht-title">📝 Format Quick Input</div>
+            <div class="qht-row"><code>Teks task</code> <span>wajib</span></div>
+            <div class="qht-divider"></div>
+            <div class="qht-section">📅 Tanggal <code>@...</code></div>
+            <div class="qht-row">
+              <code>@today</code> <span>atau <code>@hari-ini</code></span>
+            </div>
+            <div class="qht-row">
+              <code>@besok</code> <span>atau <code>@tomorrow</code></span>
+            </div>
+            <div class="qht-row"><code>@lusa</code></div>
+            <div class="qht-row">
+              <code>@minggu-depan</code> <span>7 hari ke depan</span>
+            </div>
+            <div class="qht-row"><code>@bulan-depan</code></div>
+            <div class="qht-row">
+              <code>@senin</code> / <code>@jumat</code> / <code>@sabtu</code>
+            </div>
+            <div class="qht-row">
+              <code>@2026-04-25</code> <span>tanggal spesifik</span>
+            </div>
+            <div class="qht-divider"></div>
+            <div class="qht-section">🏷️ Kategori <code>#...</code></div>
+            <div class="qht-row">
+              <code>#work</code> / <code>#personal</code> / <code>#urgent</code>
+            </div>
+            <div class="qht-divider"></div>
+            <div class="qht-section">⚡ Prioritas <code>!...</code></div>
+            <div class="qht-row">
+              <code>!high</code> / <code>!medium</code> / <code>!low</code>
+            </div>
+            <div class="qht-divider"></div>
+            <div class="qht-example">
+              💡 Contoh:<br /><code>Rapat klien #work !high @besok</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== MAIN APP ===== -->
+    <main class="app-container">
+      <!-- Sidebar -->
+      <aside class="sidebar">
+        <nav class="month-nav">
+          <button class="nav-btn" id="btnPrevPeriod" title="Sebelumnya">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M15 18L9 12L15 6"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <div class="month-display">
+            <div class="month-name" id="monthName">April</div>
+            <div class="year-name" id="yearName">2026</div>
+          </div>
+          <button class="nav-btn" id="btnNextPeriod" title="Berikutnya">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M9 18L15 12L9 6"
+                stroke="currentColor"
+                stroke-width="2.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </nav>
+
+        <button class="btn-today" id="btnToday">Hari Ini</button>
+
+        <!-- Status Libur -->
+        <div class="holiday-info" id="holidayInfo" hidden>
+          <div class="holiday-info__icon">🎌</div>
+          <div class="holiday-info__text" id="holidayInfoText">
+            Memuat libur...
+          </div>
+        </div>
+
+        <!-- Statistik -->
+        <div class="stats-box">
+          <div class="stats-title">Ringkasan Bulan Ini</div>
+          <div class="stats-grid">
+            <div class="stat-item stat-item--total">
+              <span class="stat-num" id="statTotal">0</span>
+              <span class="stat-label">Total</span>
+            </div>
+            <div class="stat-item stat-item--done">
+              <span class="stat-num" id="statDone">0</span>
+              <span class="stat-label">Selesai</span>
+            </div>
+            <div class="stat-item stat-item--high">
+              <span class="stat-num" id="statHigh">0</span>
+              <span class="stat-label">Mendesak</span>
+            </div>
+            <div class="stat-item stat-item--pending">
+              <span class="stat-num" id="statPending">0</span>
+              <span class="stat-label">Pending</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Filter Kategori -->
+        <div class="filter-box">
+          <div class="filter-title">Kategori</div>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check"
+              data-cat="work"
+              checked
+            />
+            <span class="legend-dot legend-dot--work"></span>
+            <span>Kerja</span>
+          </label>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check"
+              data-cat="personal"
+              checked
+            />
+            <span class="legend-dot legend-dot--personal"></span>
+            <span>Pribadi</span>
+          </label>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check"
+              data-cat="urgent"
+              checked
+            />
+            <span class="legend-dot legend-dot--urgent"></span>
+            <span>Mendesak</span>
+          </label>
+        </div>
+
+        <!-- Filter Prioritas -->
+        <div class="filter-box">
+          <div class="filter-title">Prioritas</div>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check-p"
+              data-priority="high"
+              checked
+            />
+            <span class="prio-dot prio-dot--high"></span>
+            <span>Tinggi</span>
+          </label>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check-p"
+              data-priority="medium"
+              checked
+            />
+            <span class="prio-dot prio-dot--medium"></span>
+            <span>Sedang</span>
+          </label>
+          <label class="filter-item">
+            <input
+              type="checkbox"
+              class="filter-check-p"
+              data-priority="low"
+              checked
+            />
+            <span class="prio-dot prio-dot--low"></span>
+            <span>Rendah</span>
+          </label>
+        </div>
+      </aside>
+
+      <!-- Content Area -->
+      <section class="calendar-section">
+        <!-- ---- VIEW: BULANAN ---- -->
+        <div id="viewMonthly" class="view-content">
+          <div class="calendar-day-headers">
+            <div class="day-header day-header--sun">Min</div>
+            <div class="day-header">Sen</div>
+            <div class="day-header">Sel</div>
+            <div class="day-header">Rab</div>
+            <div class="day-header">Kam</div>
+            <div class="day-header">Jum</div>
+            <div class="day-header day-header--sat">Sab</div>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+        </div>
+
+        <!-- ---- VIEW: MINGGUAN ---- -->
+        <div id="viewWeekly" class="view-content" hidden>
+          <div class="weekly-day-headers" id="weeklyDayHeaders"></div>
+          <div class="weekly-grid" id="weeklyGrid"></div>
+        </div>
+
+        <!-- ---- VIEW: AGENDA ---- -->
+        <div id="viewAgenda" class="view-content" hidden>
+          <div class="agenda-list" id="agendaList"></div>
+        </div>
+      </section>
+
+      <!-- ---- DETAIL PANEL ---- -->
+      <aside class="detail-panel" id="detailPanel" hidden>
+        <div class="detail-panel__header">
+          <span class="detail-panel__title">Detail Task</span>
+          <button class="detail-close-btn" id="btnDetailClose" title="Tutup">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <line
+                x1="1"
+                y1="1"
+                x2="12"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="12"
+                y1="1"
+                x2="1"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="detail-panel__body" id="detailBody">
+          <!-- Diisi oleh renderer.js -->
+        </div>
+      </aside>
+    </main>
+
+    <!-- ===== MODAL TAMBAH/EDIT TASK ===== -->
+    <div class="modal-overlay" id="modalOverlay" hidden>
+      <div
+        class="modal"
+        id="taskModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="modalTitle"
+      >
+        <div class="modal__header">
+          <h2 class="modal__title" id="modalTitle">Tambah Task</h2>
+          <button class="modal__close" id="btnModalClose" aria-label="Tutup">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <line
+                x1="1"
+                y1="1"
+                x2="12"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="12"
+                y1="1"
+                x2="1"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="modal__body">
+          <div class="modal-date-display" id="modalDateDisplay"></div>
+
+          <div class="form-group">
+            <label class="form-label" for="taskInput">Deskripsi Task</label>
+            <input
+              type="text"
+              id="taskInput"
+              class="form-input"
+              placeholder="Tulis task di sini..."
+              maxlength="200"
+              autocomplete="off"
+            />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group form-group--half">
+              <label class="form-label">Kategori</label>
+              <div class="category-picker">
+                <label class="cat-option">
+                  <input type="radio" name="taskCat" value="work" checked />
+                  <span class="cat-chip cat-chip--work"
+                    ><span class="cat-dot"></span>Kerja</span
+                  >
+                </label>
+                <label class="cat-option">
+                  <input type="radio" name="taskCat" value="personal" />
+                  <span class="cat-chip cat-chip--personal"
+                    ><span class="cat-dot"></span>Pribadi</span
+                  >
+                </label>
+                <label class="cat-option">
+                  <input type="radio" name="taskCat" value="urgent" />
+                  <span class="cat-chip cat-chip--urgent"
+                    ><span class="cat-dot"></span>Mendesak</span
+                  >
+                </label>
+              </div>
+            </div>
+
+            <div class="form-group form-group--half">
+              <label class="form-label">Prioritas</label>
+              <div class="priority-picker">
+                <label class="prio-option">
+                  <input type="radio" name="taskPriority" value="high" />
+                  <span class="prio-chip prio-chip--high">🔴 Tinggi</span>
+                </label>
+                <label class="prio-option">
+                  <input
+                    type="radio"
+                    name="taskPriority"
+                    value="medium"
+                    checked
+                  />
+                  <span class="prio-chip prio-chip--medium">🟡 Sedang</span>
+                </label>
+                <label class="prio-option">
+                  <input type="radio" name="taskPriority" value="low" />
+                  <span class="prio-chip prio-chip--low">🟢 Rendah</span>
+                </label>
+              </div>
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group form-group--half">
+              <label class="form-label" for="reminderInput">Pengingat</label>
+              <input
+                type="datetime-local"
+                id="reminderInput"
+                class="form-input form-input--datetime"
+              />
+            </div>
+            <div class="form-group form-group--half">
+              <label class="form-label" for="reminderRepeat">Pengulangan</label>
+              <select id="reminderRepeat" class="form-select">
+                <option value="none">Tidak ada</option>
+                <option value="daily">Setiap hari</option>
+                <option value="weekly">Setiap minggu</option>
+                <option value="monthly">Setiap bulan</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal__footer">
+          <button class="btn btn--ghost" id="btnCancelModal">Batal</button>
+          <button class="btn btn--primary" id="btnSaveTask">Simpan Task</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+    <!-- ===== MODAL PENGATURAN ===== -->
+    <div class="modal-overlay" id="settingsOverlay" hidden>
+      <div
+        class="modal settings-modal"
+        id="settingsModal"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="settingsTitle"
+      >
+        <div class="modal__header">
+          <h2 class="modal__title" id="settingsTitle">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              style="margin-right: 6px; vertical-align: -2px"
+            >
+              <circle
+                cx="12"
+                cy="12"
+                r="3"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+              <path
+                d="M12 2v2M12 20v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M2 12h2M20 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+            Pengaturan
+          </h2>
+          <button
+            class="modal__close"
+            id="btnSettingsClose"
+            aria-label="Tutup pengaturan"
+          >
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+              <line
+                x1="1"
+                y1="1"
+                x2="12"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="12"
+                y1="1"
+                x2="1"
+                y2="12"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <div class="modal__body settings-body">
+          <!-- Data & Backup -->
+          <div class="settings-section">
+            <div class="settings-section-title">Data &amp; Backup</div>
+
+            <button
+              class="settings-action-btn settings-action-btn--export"
+              id="btnExportData"
+            >
+              <div class="sab-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 3v13M5 14l7 7 7-7"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M3 20h18"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <div class="sab-text">
+                <div class="sab-title">Export Data (JSON)</div>
+                <div class="sab-desc">Simpan semua task ke file .json</div>
+              </div>
+              <div class="sab-arrow">→</div>
+            </button>
+
+            <button
+              class="settings-action-btn settings-action-btn--import"
+              id="btnImportData"
+            >
+              <div class="sab-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path
+                    d="M12 21V8M5 10l7-7 7 7"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  />
+                  <path
+                    d="M3 20h18"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                </svg>
+              </div>
+              <div class="sab-text">
+                <div class="sab-title">Import Data (JSON)</div>
+                <div class="sab-desc">Muat task dari file backup .json</div>
+              </div>
+              <div class="sab-arrow">→</div>
+            </button>
+            <!-- Hidden file input untuk import -->
+            <input
+              type="file"
+              id="importFileInput"
+              accept=".json,application/json"
+              hidden
+            />
+          </div>
+
+          <!-- Tentang Aplikasi -->
+          <div class="settings-section">
+            <div class="settings-section-title">Tentang Aplikasi</div>
+            <div class="settings-about-card">
+              <div class="sac-logo">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+                  <rect
+                    x="3"
+                    y="4"
+                    width="18"
+                    height="18"
+                    rx="3"
+                    stroke="#378ADD"
+                    stroke-width="2"
+                    fill="rgba(55,138,221,0.1)"
+                  />
+                  <path d="M3 9H21" stroke="#378ADD" stroke-width="2" />
+                  <path
+                    d="M8 2V6M16 2V6"
+                    stroke="#378ADD"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                  />
+                  <rect
+                    x="7"
+                    y="13"
+                    width="4"
+                    height="4"
+                    rx="1"
+                    fill="#378ADD"
+                    opacity="0.7"
+                  />
+                </svg>
+              </div>
+              <div class="sac-info">
+                <div class="sac-name">Tododo</div>
+                <div class="sac-version">Versi 1.0.1</div>
+                <div class="sac-desc">
+                  Kalender Task Manager ringan<br />untuk Windows
+                </div>
+              </div>
+            </div>
+
+            <div class="settings-credit-list">
+              <div class="scl-item">
+                <span class="scl-label">Dibuat oleh</span>
+                <span class="scl-value">Eben</span>
+              </div>
+              <div class="scl-item">
+                <span class="scl-label">API Libur Nasional</span>
+                <span class="scl-value">
+                  <a
+                    class="scl-link"
+                    href="https://libur.deno.dev"
+                    title="Buka di browser"
+                    >libur.deno.dev</a
+                  >
+                </span>
+              </div>
+              <div class="scl-item">
+                <span class="scl-label">Sumber API</span>
+                <span class="scl-value">
+                  <a
+                    class="scl-link"
+                    href="https://github.com/radyakaze/api-hari-libur"
+                    title="GitHub"
+                    >api-hari-libur</a
+                  >
+                </span>
+              </div>
+              <div class="scl-item">
+                <span class="scl-label">Dibangun dengan</span>
+                <span class="scl-value">Electron · Vanilla JS</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ===== CUSTOM CONFIRM DIALOG ===== -->
+    <div class="confirm-overlay" id="confirmOverlay" hidden>
+      <div
+        class="confirm-dialog"
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="confirmTitle"
+      >
+        <div class="confirm-icon-wrap">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path
+              d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linejoin="round"
+            />
+            <line
+              x1="12"
+              y1="9"
+              x2="12"
+              y2="13"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+            />
+            <line
+              x1="12"
+              y1="17"
+              x2="12.01"
+              y2="17"
+              stroke="currentColor"
+              stroke-width="3"
+              stroke-linecap="round"
+            />
+          </svg>
+        </div>
+        <div class="confirm-title" id="confirmTitle">Hapus Task?</div>
+        <div class="confirm-msg" id="confirmMsg">
+          Task ini akan dihapus permanen.
+        </div>
+        <div class="confirm-actions">
+          <button class="btn btn--ghost" id="btnConfirmCancel">Batal</button>
+          <button class="btn btn--danger" id="btnConfirmOk">Hapus</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="renderer.js"></script>
+  </body>
+</html>
