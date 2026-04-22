@@ -11,6 +11,8 @@
 // ============================================================
 
 const STORAGE_TASKS    = 'ctm_tasks_v2';
+const STORAGE_STICKIES = 'ctm_stickies_v2';
+const STORAGE_LAYOUT   = 'ctm_sticky_layout';
 const STORAGE_HOLIDAYS = 'ctm_holidays_v2_'; // + year suffix (v2 = libur.deno.dev)
 // Sumber: https://libur.deno.dev | https://github.com/radyakaze/api-hari-libur
 const HOLIDAY_API      = 'https://libur.deno.dev/api?year={year}';
@@ -42,6 +44,8 @@ const state = {
   editingTask:  null,       // { dateStr, taskId } | null (null = mode tambah)
   detailTask:   null,       // { dateStr, taskId } | null
   dragData:     null,
+  stickies:     [],         // array of { id, text, color, x, y }
+  scatteredLayout: false,   // false=grid, true=scattered (berantakan)
 };
 
 // ============================================================
@@ -68,6 +72,17 @@ function saveTasks() {
   } catch {
     console.warn('[CTM] Gagal simpan localStorage');
   }
+}
+
+function loadStickies() {
+  try {
+    const raw = localStorage.getItem(STORAGE_STICKIES);
+    state.stickies = raw ? JSON.parse(raw) : [];
+  } catch { state.stickies = []; }
+}
+
+function saveStickies() {
+  try { localStorage.setItem(STORAGE_STICKIES, JSON.stringify(state.stickies)); } catch {}
 }
 
 /**
@@ -148,17 +163,18 @@ function updateHolidayInfoSidebar() {
   const { year, month } = state;
   const mm = String(month + 1).padStart(2, '0');
   const prefix = `${year}-${mm}-`;
+  
   const thisMonthHolidays = Object.entries(state.holidays)
     .filter(([d]) => d.startsWith(prefix))
     .map(([d, name]) => {
       const day = parseInt(d.split('-')[2], 10);
-      return `${day} ${name}`;
+      return `<div class="holiday-item"><span class="holiday-date">${day}</span> <span class="holiday-name">${name}</span></div>`;
     });
 
   const el = document.getElementById('holidayInfo');
   const txt = document.getElementById('holidayInfoText');
   if (thisMonthHolidays.length > 0) {
-    txt.textContent = thisMonthHolidays.join(' • ');
+    txt.innerHTML = `<div class="holiday-list">${thisMonthHolidays.join('')}</div>`;
     el.hidden = false;
   } else {
     el.hidden = true;
@@ -226,6 +242,12 @@ const DOM = {
   viewMonthly:      $('viewMonthly'),
   viewWeekly:       $('viewWeekly'),
   viewAgenda:       $('viewAgenda'),
+  viewNotepad:      $('viewNotepad'),
+  boardGrid:        $('boardGrid'),
+  btnOpenNotepad:   $('btnOpenNotepad'),
+  btnAddSticky:     $('btnAddSticky'),
+  btnLayoutToggle:  $('btnLayoutToggle'),
+  layoutLabel:      $('layoutLabel'),
   calendarGrid:     $('calendarGrid'),
   weeklyDayHeaders: $('weeklyDayHeaders'),
   weeklyGrid:       $('weeklyGrid'),
@@ -301,21 +323,72 @@ function checkReminders() {
 }
 
 function fireReminder(task, dateStr) {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'default') {
-    Notification.requestPermission().then(perm => {
-      if (perm === 'granted') doNotify(task, dateStr);
-    });
-  } else if (Notification.permission === 'granted') {
-    doNotify(task, dateStr);
-  }
+  doNotify(task, dateStr);
 }
 
 function doNotify(task, dateStr) {
   const prioLabel = { high: '[Tinggi]', medium: '[Sedang]', low: '[Rendah]' }[task.priority] || '';
   const title = `Pengingat Task ${prioLabel}`;
   const body  = `${task.text}\n${formatDisplayDate(dateStr)}`;
-  new Notification(title, { body, silent: false });
+  
+  // Gunakan Native Windows Notification jika tersedia di desktop
+  if (window.electronAPI && window.electronAPI.showNotification) {
+    window.electronAPI.showNotification({ title, body });
+    // Juga mainkan suara alarm di web sebagai penekanan
+    playAlarmSound();
+  } else {
+    // Fallback web
+    if (!('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+      Notification.requestPermission().then(perm => {
+        if (perm === 'granted') {
+          new Notification(title, { body, silent: false });
+          playAlarmSound();
+        }
+      });
+    } else if (Notification.permission === 'granted') {
+      new Notification(title, { body, silent: false });
+      playAlarmSound();
+    }
+  }
+}
+
+// Fungsi sederhana untuk menghasilkan suara beep/alarm menggunakan Web Audio API
+function playAlarmSound() {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    // Bunyi 1
+    const osc1 = audioCtx.createOscillator();
+    const gainNode1 = audioCtx.createGain();
+    osc1.connect(gainNode1);
+    gainNode1.connect(audioCtx.destination);
+    
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(800, audioCtx.currentTime);
+    gainNode1.gain.setValueAtTime(0.5, audioCtx.currentTime);
+    gainNode1.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+    osc1.start();
+    osc1.stop(audioCtx.currentTime + 0.3);
+    
+    // Bunyi 2
+    setTimeout(() => {
+      const osc2 = audioCtx.createOscillator();
+      const gainNode2 = audioCtx.createGain();
+      osc2.connect(gainNode2);
+      gainNode2.connect(audioCtx.destination);
+      
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1000, audioCtx.currentTime);
+      gainNode2.gain.setValueAtTime(0.5, audioCtx.currentTime);
+      gainNode2.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+      osc2.start();
+      osc2.stop(audioCtx.currentTime + 0.3);
+    }, 200);
+
+  } catch (e) {
+    // Abaikan jika tidak didukung
+  }
 }
 
 function calcNextReminder(reminderStr, repeat) {
@@ -338,10 +411,15 @@ function switchView(viewName) {
   DOM.viewMonthly.hidden = viewName !== 'monthly';
   DOM.viewWeekly.hidden  = viewName !== 'weekly';
   DOM.viewAgenda.hidden  = viewName !== 'agenda';
+  DOM.viewNotepad.hidden = viewName !== 'notepad';
 
   document.querySelectorAll('.view-btn').forEach(btn => {
     btn.classList.toggle('is-active', btn.dataset.view === viewName);
   });
+  
+  if (DOM.btnOpenNotepad) {
+    DOM.btnOpenNotepad.classList.toggle('is-active', viewName === 'notepad');
+  }
 
   updateSidebarHeader();
   renderCurrentView();
@@ -352,12 +430,13 @@ function renderCurrentView() {
     case 'monthly': renderMonthly(); break;
     case 'weekly':  renderWeekly();  break;
     case 'agenda':  renderAgenda();  break;
+    case 'notepad': renderNotepad(); break;
   }
 }
 
 function updateSidebarHeader() {
   const { view, year, month, weekOffset } = state;
-  if (view === 'monthly' || view === 'agenda') {
+  if (view === 'monthly' || view === 'agenda' || view === 'notepad') {
     DOM.monthName.textContent = MONTHS_ID[month];
     DOM.yearName.textContent  = year;
   } else if (view === 'weekly') {
@@ -1578,6 +1657,277 @@ function importTasks(file) {
 // EVENT BINDING
 // ============================================================
 
+// ============================================================
+// NOTEPAD / STICKY NOTES
+// ============================================================
+
+const STORAGE_LAYOUT_KEY = STORAGE_LAYOUT;
+
+function loadLayoutPref() {
+  try {
+    state.scatteredLayout = localStorage.getItem(STORAGE_LAYOUT_KEY) === 'scattered';
+  } catch { state.scatteredLayout = false; }
+}
+
+function saveLayoutPref() {
+  try { localStorage.setItem(STORAGE_LAYOUT_KEY, state.scatteredLayout ? 'scattered' : 'grid'); } catch {}
+}
+
+function toggleLayout() {
+  state.scatteredLayout = !state.scatteredLayout;
+  saveLayoutPref();
+  applyLayoutUI();
+  renderNotepad();
+}
+
+function applyLayoutUI() {
+  if (!DOM.btnLayoutToggle) return;
+  DOM.btnLayoutToggle.classList.toggle('is-scattered', state.scatteredLayout);
+  if (DOM.layoutLabel) {
+    DOM.layoutLabel.textContent = state.scatteredLayout ? 'Berantakan' : 'Rapih';
+  }
+  if (DOM.boardGrid) {
+    DOM.boardGrid.classList.toggle('is-scattered', state.scatteredLayout);
+  }
+}
+
+function renderNotepad() {
+  if (!DOM.boardGrid) return;
+  DOM.boardGrid.innerHTML = '';
+  applyLayoutUI();
+  state.stickies.forEach((sticky, idx) => {
+    DOM.boardGrid.appendChild(buildStickyCard(sticky, idx));
+  });
+}
+
+function buildStickyCard(sticky, idx) {
+  const card = document.createElement('div');
+  card.className = 'sticky-note';
+  card.dataset.id = sticky.id;
+  if (sticky.color) card.dataset.color = sticky.color;
+
+  // Position for scattered mode
+  if (state.scatteredLayout) {
+    const x = sticky.x != null ? sticky.x : 20 + (idx % 4) * 220;
+    const y = sticky.y != null ? sticky.y : 20 + Math.floor(idx / 4) * 210;
+    card.style.left = x + 'px';
+    card.style.top = y + 'px';
+  }
+
+  const header = document.createElement('div');
+  header.className = 'sticky-header';
+
+  // --- Format controls (B/I/U) ---
+  const formatControls = document.createElement('div');
+  formatControls.className = 'sticky-controls';
+
+  const boldBtn = document.createElement('button');
+  boldBtn.className = 'sticky-btn format-btn';
+  boldBtn.title = 'Bold';
+  boldBtn.textContent = 'B';
+
+  const italicBtn = document.createElement('button');
+  italicBtn.className = 'sticky-btn format-btn';
+  italicBtn.title = 'Italic';
+  italicBtn.innerHTML = '<i>I</i>';
+
+  const underlineBtn = document.createElement('button');
+  underlineBtn.className = 'sticky-btn format-btn';
+  underlineBtn.title = 'Underline';
+  underlineBtn.innerHTML = '<u>U</u>';
+
+  formatControls.appendChild(boldBtn);
+  formatControls.appendChild(italicBtn);
+  formatControls.appendChild(underlineBtn);
+
+  // --- Right controls (color, pin, delete) ---
+  const controls = document.createElement('div');
+  controls.className = 'sticky-controls';
+
+  const colorBtn = document.createElement('button');
+  colorBtn.className = 'sticky-btn';
+  colorBtn.title = 'Ubah Warna';
+  colorBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/></svg>';
+  colorBtn.onclick = () => {
+    const colors = ['yellow', 'pink', 'blue', 'green'];
+    let idx2 = colors.indexOf(sticky.color || 'yellow');
+    idx2 = (idx2 + 1) % colors.length;
+    sticky.color = colors[idx2];
+    card.dataset.color = sticky.color;
+    saveStickies();
+  };
+
+  const pinBtn = document.createElement('button');
+  pinBtn.className = 'sticky-btn';
+  pinBtn.title = 'Pin to Tab (Pop out)';
+  pinBtn.innerHTML = '<svg width="10" height="10" viewBox="0 0 24 24" fill="none"><path d="M12 2L12 14M8 6L12 2L16 6M6 22L12 14L18 22" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+  pinBtn.onclick = () => {
+    if (window.electronAPI && window.electronAPI.createSticky) {
+      window.electronAPI.createSticky({ id: sticky.id, text: sticky.text || '', color: sticky.color || 'yellow' });
+    }
+  };
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'sticky-btn';
+  delBtn.innerHTML = '<svg width="8" height="8" viewBox="0 0 10 10" fill="none"><line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>';
+  delBtn.title = 'Hapus';
+  delBtn.onclick = () => {
+    openConfirmDialog({
+      title: 'Hapus Sticky Note?',
+      message: 'Catatan ini akan dihapus permanen dan tidak bisa dikembalikan.',
+      confirmLabel: 'Hapus',
+      onConfirm: () => {
+        state.stickies = state.stickies.filter(s => s.id !== sticky.id);
+        saveStickies();
+        renderNotepad();
+        showToast('Sticky note dihapus');
+      },
+    });
+  };
+
+  controls.appendChild(colorBtn);
+  controls.appendChild(pinBtn);
+  controls.appendChild(delBtn);
+  header.appendChild(formatControls);
+  header.appendChild(controls);
+
+  // --- Editor (contenteditable) ---
+  const editor = document.createElement('div');
+  editor.className = 'sticky-content';
+  editor.contentEditable = 'true';
+  editor.innerHTML = sticky.text || '';
+  editor.dataset.placeholder = 'Ketik catatan...';
+
+  let typingTimer;
+  editor.addEventListener('input', () => {
+    clearTimeout(typingTimer);
+    sticky.text = editor.innerHTML;
+    typingTimer = setTimeout(saveStickies, 500);
+  });
+
+  // --- B/I/U active state tracking ---
+  const updateFormatState = () => {
+    try {
+      boldBtn.classList.toggle('active', document.queryCommandState('bold'));
+      italicBtn.classList.toggle('active', document.queryCommandState('italic'));
+      underlineBtn.classList.toggle('active', document.queryCommandState('underline'));
+    } catch {}
+  };
+
+  boldBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    document.execCommand('bold', false, null);
+    updateFormatState();
+  });
+  italicBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    document.execCommand('italic', false, null);
+    updateFormatState();
+  });
+  underlineBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    document.execCommand('underline', false, null);
+    updateFormatState();
+  });
+
+  editor.addEventListener('keyup', updateFormatState);
+  editor.addEventListener('click', updateFormatState);
+  editor.addEventListener('focus', updateFormatState);
+
+  // --- Image paste handler ---
+  editor.addEventListener('paste', (e) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        e.preventDefault();
+        const file = items[i].getAsFile();
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          editor.focus();
+          document.execCommand('insertImage', false, ev.target.result);
+          sticky.text = editor.innerHTML;
+          saveStickies();
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  });
+
+  // --- Image drag & drop handler (prevent gallery, insert into note) ---
+  editor.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+  });
+  editor.addEventListener('drop', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      Array.from(e.dataTransfer.files).forEach(file => {
+        if (file.type.startsWith('image/')) {
+          const reader = new FileReader();
+          reader.onload = (ev) => {
+            editor.focus();
+            document.execCommand('insertImage', false, ev.target.result);
+            sticky.text = editor.innerHTML;
+            saveStickies();
+          };
+          reader.readAsDataURL(file);
+        }
+      });
+    }
+  });
+
+  // --- Drag to reposition (scattered mode) ---
+  if (state.scatteredLayout) {
+    let isDragging = false, startX = 0, startY = 0, origX = 0, origY = 0;
+
+    header.style.cursor = 'grab';
+    header.addEventListener('mousedown', (e) => {
+      // Jangan drag jika klik tombol
+      if (e.target.closest('.sticky-btn')) return;
+      isDragging = true;
+      startX = e.clientX;
+      startY = e.clientY;
+      origX = parseInt(card.style.left) || 0;
+      origY = parseInt(card.style.top) || 0;
+      card.classList.add('is-dragging-note');
+      header.style.cursor = 'grabbing';
+      e.preventDefault();
+    });
+
+    const onMouseMove = (e) => {
+      if (!isDragging) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      card.style.left = (origX + dx) + 'px';
+      card.style.top = (origY + dy) + 'px';
+    };
+
+    const onMouseUp = () => {
+      if (!isDragging) return;
+      isDragging = false;
+      card.classList.remove('is-dragging-note');
+      header.style.cursor = 'grab';
+      sticky.x = parseInt(card.style.left) || 0;
+      sticky.y = parseInt(card.style.top) || 0;
+      saveStickies();
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  card.appendChild(header);
+  card.appendChild(editor);
+  return card;
+}
+
+// ============================================================
+// BIND EVENTS
+// ============================================================
+
 function bindEvents() {
   // Navigation
   $('btnPrevPeriod').addEventListener('click', prevPeriod);
@@ -1727,6 +2077,40 @@ function bindEvents() {
     if (e.target === $('settingsOverlay')) closeSettings();
   });
 
+  if (DOM.btnOpenNotepad) {
+    DOM.btnOpenNotepad.addEventListener('click', () => switchView('notepad'));
+  }
+  if (DOM.btnAddSticky) {
+    DOM.btnAddSticky.addEventListener('click', () => {
+      const newSticky = { id: genId(), text: '', color: 'yellow' };
+      if (state.scatteredLayout) {
+        // Place new sticky at a somewhat random but visible position
+        const count = state.stickies.length;
+        newSticky.x = 20 + (count % 4) * 220 + Math.floor(Math.random() * 30);
+        newSticky.y = 20 + Math.floor(count / 4) * 210 + Math.floor(Math.random() * 30);
+      }
+      state.stickies.push(newSticky);
+      saveStickies();
+      renderNotepad();
+    });
+  }
+  if (DOM.btnLayoutToggle) {
+    DOM.btnLayoutToggle.addEventListener('click', toggleLayout);
+  }
+
+  // Prevent file drag&drop from opening as gallery on main window
+  document.addEventListener('dragover', (e) => {
+    // Allow internal task drag&drop to work, but prevent file drops from navigating
+    if (e.dataTransfer && e.dataTransfer.types && e.dataTransfer.types.includes('Files')) {
+      e.preventDefault();
+    }
+  });
+  document.addEventListener('drop', (e) => {
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      e.preventDefault();
+    }
+  });
+
   // Export
   $('btnExportData').addEventListener('click', exportTasks);
 
@@ -1765,6 +2149,26 @@ function bindEvents() {
       DOM.btnPin.title = isPinned ? 'Lepas pin' : 'Pin (Selalu di Atas)';
       showToast(isPinned ? 'Window di-pin di atas' : 'Pin dilepas');
     });
+
+    if (window.electronAPI.onStickyUpdate) {
+      window.electronAPI.onStickyUpdate((data) => {
+        const idx = state.stickies.findIndex(s => s.id === data.id);
+        if (idx !== -1) {
+          state.stickies[idx].text = data.text;
+          state.stickies[idx].color = data.color;
+          saveStickies();
+          // Update visual di viewNotepad jika sedang aktif
+          if (state.view === 'notepad') {
+            const card = DOM.boardGrid.querySelector(`.sticky-note[data-id="${data.id}"]`);
+            if (card) {
+              card.dataset.color = data.color;
+              const txtBox = card.querySelector('.sticky-content');
+              if (txtBox && txtBox.innerHTML !== data.text) txtBox.innerHTML = data.text;
+            }
+          }
+        }
+      });
+    }
   }
 }
 
@@ -1774,6 +2178,8 @@ function bindEvents() {
 
 async function init() {
   loadTasks();
+  loadStickies();
+  loadLayoutPref();
   bindEvents();
   updateSidebarHeader();
 

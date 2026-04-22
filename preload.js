@@ -18,4 +18,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Buka URL di browser default sistem
   openExternal: (url) => ipcRenderer.send('open-external', url),
+
+  // Notifikasi via Main Process
+  showNotification: ({ title, body }) => ipcRenderer.send('show-notification', { title, body }),
+
+  // Sticky Notes (Papan Tulis)
+  createSticky: (data) => ipcRenderer.send('create-sticky', data),
+  onStickyUpdate: (callback) => ipcRenderer.on('sync-sticky-update', (_event, data) => callback(data)),
 });

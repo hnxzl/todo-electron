@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="notification.css">
+</head>
+<body>
+  <div class="notification-container" id="notifBox">
+    <div class="notif-icon-wrap">
+      <div class="notif-icon">🔔</div>
+    </div>
+    <div class="notif-content">
+      <div class="notif-title" id="notifTitle">Tododo</div>
+      <div class="notif-body" id="notifBody">Ada task yang menunggu.</div>
+    </div>
+    <div class="notif-close" id="btnClose">
+      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+        <line x1="1" y1="1" x2="9" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        <line x1="9" y1="1" x2="1" y2="9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </div>
+  <script>
+    // Menerima data
+    window.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('notifBox').classList.add('show');
+      
+      if (window.electronNotification) {
+        window.electronNotification.onNotificationData((data) => {
+          document.getElementById('notifTitle').textContent = data.title;
+          document.getElementById('notifBody').textContent = data.body;
+        });
+
+        // Close button
+        document.getElementById('btnClose').addEventListener('click', (e) => {
+          e.stopPropagation();
+          window.electronNotification.closeNotification();
+        });
+
+        // Click anywhere else to open app
+        document.getElementById('notifBox').addEventListener('click', () => {
+          window.electronNotification.clickNotification();
+        });
+      }
+    });
+  </script>
+</body>
+</html>

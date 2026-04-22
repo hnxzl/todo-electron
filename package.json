@@ -35,5 +35,8 @@
   "devDependencies": {
     "electron": "^35.0.0",
     "electron-builder": "^26.8.1"
+  },
+  "dependencies": {
+    "flatpickr": "^4.6.13"
   }
 }

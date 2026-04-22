@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Sticky Note</title>
+    <link rel="stylesheet" href="sticky.css" />
+  </head>
+  <body>
+    <div class="sticky-container" id="stickyContainer">
+      <div class="sticky-header" id="dragHeader">
+        <div class="sticky-controls" id="formatControls">
+          <button class="sticky-btn format-btn" id="btnBold" title="Bold">
+            B
+          </button>
+          <button class="sticky-btn format-btn" id="btnItalic" title="Italic">
+            <i>I</i>
+          </button>
+          <button
+            class="sticky-btn format-btn"
+            id="btnUnderline"
+            title="Underline"
+          >
+            <u>U</u>
+          </button>
+        </div>
+        <div class="sticky-controls">
+          <button class="sticky-btn" id="btnColor" title="Ubah Warna">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <circle
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                stroke-width="2"
+              />
+            </svg>
+          </button>
+          <button
+            class="sticky-btn"
+            id="btnPin"
+            title="Lepas Pin (Selalu di Atas)"
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+              <path
+                d="M12 2L12 14M8 6L12 2L16 6M6 22L12 14L18 22"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <button class="sticky-btn" id="btnClose" title="Tutup">
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+              <line
+                x1="1"
+                y1="1"
+                x2="9"
+                y2="9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+              <line
+                x1="9"
+                y1="1"
+                x2="1"
+                y2="9"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      </div>
+      <div
+        class="sticky-content"
+        id="stickyContent"
+        contenteditable="true"
+        data-placeholder="Ketik catatan..."
+      ></div>
+    </div>
+    <script>
+      const container = document.getElementById("stickyContainer");
+      const content = document.getElementById("stickyContent");
+      const btnColor = document.getElementById("btnColor");
+      const btnPin = document.getElementById("btnPin");
+      const btnClose = document.getElementById("btnClose");
+
+      let currentId = null;
+      let currentColor = "yellow";
+      let isPinned = true;
+
+      const updatePinUI = () => {
+        btnPin.classList.toggle("active", isPinned);
+        btnPin.title = isPinned
+          ? "Lepas Pin (Selalu di Atas)"
+          : "Pin (Selalu di Atas)";
+      };
+      updatePinUI();
+
+      // Terima inisialisasi dari main process
+      window.stickyAPI.onInitData((data) => {
+        currentId = data.id;
+        content.innerHTML = data.text || "";
+        currentColor = data.color || "yellow";
+        container.dataset.color = currentColor;
+      });
+
+      let typingTimer;
+      content.addEventListener("input", () => {
+        clearTimeout(typingTimer);
+        typingTimer = setTimeout(() => {
+          window.stickyAPI.updateContent(
+            currentId,
+            content.innerHTML,
+            currentColor,
+          );
+        }, 500);
+      });
+
+      btnColor.addEventListener("click", () => {
+        const colors = ["yellow", "pink", "blue", "green"];
+        let idx = colors.indexOf(currentColor);
+        idx = (idx + 1) % colors.length;
+        currentColor = colors[idx];
+        container.dataset.color = currentColor;
+        window.stickyAPI.updateContent(
+          currentId,
+          content.innerHTML,
+          currentColor,
+        );
+      });
+
+      btnPin.addEventListener("click", () => {
+        window.stickyAPI.togglePin();
+      });
+
+      window.stickyAPI.onPinStatusChanged((nextStatus) => {
+        isPinned = !!nextStatus;
+        updatePinUI();
+      });
+
+      btnClose.addEventListener("click", () => {
+        window.stickyAPI.closeSticky();
+      });
+
+      // Formatting State Updates
+      const btnBold = document.getElementById("btnBold");
+      const btnItalic = document.getElementById("btnItalic");
+      const btnUnderline = document.getElementById("btnUnderline");
+
+      const updateFormattingState = () => {
+        try {
+          btnBold.classList.toggle(
+            "active",
+            document.queryCommandState("bold"),
+          );
+          btnItalic.classList.toggle(
+            "active",
+            document.queryCommandState("italic"),
+          );
+          btnUnderline.classList.toggle(
+            "active",
+            document.queryCommandState("underline"),
+          );
+        } catch (e) {}
+      };
+
+      btnBold.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand("bold", false, null);
+        updateFormattingState();
+      });
+      btnItalic.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand("italic", false, null);
+        updateFormattingState();
+      });
+      btnUnderline.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand("underline", false, null);
+        updateFormattingState();
+      });
+
+      document.addEventListener("selectionchange", () => {
+        if (document.activeElement === content) updateFormattingState();
+      });
+      content.addEventListener("click", updateFormattingState);
+      content.addEventListener("keyup", updateFormattingState);
+
+      // Image Paste Handler
+      content.addEventListener("paste", (e) => {
+        const items = e.clipboardData.items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf("image") !== -1) {
+            e.preventDefault();
+            const file = items[i].getAsFile();
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              document.execCommand("insertImage", false, event.target.result);
+            };
+            reader.readAsDataURL(file);
+            return;
+          }
+        }
+      });
+
+      // Image Drop Handler
+      document.addEventListener("dragover", (e) => e.preventDefault());
+      document.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+          const file = e.dataTransfer.files[0];
+          if (file.type.startsWith("image/")) {
+            const reader = new FileReader();
+            reader.onload = (event) => {
+              content.focus();
+              document.execCommand("insertImage", false, event.target.result);
+            };
+            reader.readAsDataURL(file);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>

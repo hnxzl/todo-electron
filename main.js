@@ -10,31 +10,34 @@ const {
   Tray,
   Menu,
   nativeImage,
+  Notification,
 } = require("electron");
 const path = require("path");
 
-// Optimasi memori
-app.commandLine.appendSwitch("disable-renderer-backgrounding");
-app.commandLine.appendSwitch("disable-background-timer-throttling");
-app.commandLine.appendSwitch("js-flags", "--max-old-space-size=128");
+// Penghematan memori
+app.commandLine.appendSwitch(
+  "js-flags",
+  "--max-old-space-size=64 --optimize-for-size --gc-interval=100",
+);
+app.commandLine.appendSwitch("disable-software-rasterizer");
+app.commandLine.appendSwitch(
+  "disable-features",
+  "SpareRendererForSitePerProcess",
+);
 
 let mainWindow = null;
 let tray = null;
 let isAlwaysOnTop = false;
 
+function applyStickyAlwaysOnTop(win, isPinned) {
+  if (!win || win.isDestroyed()) return;
+  // Use a stronger top level so sticky remains above normal windows.
+  win.setAlwaysOnTop(!!isPinned, isPinned ? "screen-saver" : "normal");
+  win.setVisibleOnAllWorkspaces(!!isPinned, { visibleOnFullScreen: true });
+}
+
 function createTrayIcon() {
-  const svg = `
-    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
-      <rect x="10" y="12" width="44" height="42" rx="10" fill="#0F172A"/>
-      <rect x="10" y="12" width="44" height="14" rx="10" fill="#2563EB"/>
-      <rect x="18" y="34" width="10" height="10" rx="2" fill="#E2E8F0"/>
-      <rect x="32" y="34" width="10" height="10" rx="2" fill="#E2E8F0"/>
-      <path d="M22 6v10M42 6v10" stroke="#E2E8F0" stroke-width="4" stroke-linecap="round"/>
-    </svg>
-  `;
-  return nativeImage.createFromDataURL(
-    `data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`,
-  );
+  return nativeImage.createFromPath(path.join(__dirname, "icon.png"));
 }
 
 function showWindow() {
@@ -59,7 +62,13 @@ function createTray() {
     { label: "Buka Tododo", click: () => showWindow() },
     { label: "Sembunyikan", click: () => hideWindowToTray() },
     { type: "separator" },
-    { label: "Keluar", click: () => app.quit() },
+    {
+      label: "Keluar",
+      click: () => {
+        app.isQuitting = true;
+        app.quit();
+      },
+    },
   ]);
 
   tray.setContextMenu(contextMenu);
@@ -98,7 +107,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false,
       devTools: false,
-      backgroundThrottling: false,
+      backgroundThrottling: true,
       spellcheck: false,
     },
   });
@@ -120,6 +129,15 @@ function createWindow() {
   });
 
   mainWindow.loadFile("index.html");
+
+  // Cegah drag & drop file membuka gambar seperti galeri
+  mainWindow.webContents.on("will-navigate", (event, url) => {
+    // Hanya izinkan navigasi ke file:// index.html
+    if (!url.includes("index.html")) {
+      event.preventDefault();
+    }
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -152,6 +170,68 @@ ipcMain.on("window-toggle-pin", (event) => {
   isAlwaysOnTop = !isAlwaysOnTop;
   mainWindow.setAlwaysOnTop(isAlwaysOnTop, "floating");
   event.reply("pin-status-changed", isAlwaysOnTop);
+});
+
+// ========================
+// IPC: Notifications
+// ========================
+
+let notificationWindow = null;
+
+ipcMain.on("show-notification", (event, { title, body }) => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.close();
+  }
+
+  const { width: screenWidth, height: screenHeight } =
+    screen.getPrimaryDisplay().workAreaSize;
+  const notifWidth = 360;
+  const notifHeight = 120;
+
+  notificationWindow = new BrowserWindow({
+    width: notifWidth,
+    height: notifHeight,
+    x: screenWidth - notifWidth - 20,
+    y: screenHeight - notifHeight - 20,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    resizable: false,
+    focusable: false,
+    show: false,
+    webPreferences: {
+      preload: path.join(__dirname, "notification-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  notificationWindow.loadFile("notification.html");
+
+  notificationWindow.once("ready-to-show", () => {
+    notificationWindow.showInactive();
+    notificationWindow.webContents.send("notification-data", { title, body });
+  });
+
+  setTimeout(() => {
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.close();
+    }
+  }, 7000);
+});
+
+ipcMain.on("close-notification", () => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.close();
+  }
+});
+
+ipcMain.on("click-notification", () => {
+  showWindow();
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.close();
+  }
 });
 
 // Buka URL di browser default
@@ -195,15 +275,106 @@ ipcMain.handle("fetch-url", async (event, url) => {
 });
 
 // ========================
+// IPC: Sticky Notes (Papan Tulis)
+// ========================
+
+const activeStickies = {}; // { windowId: { id, window } }
+
+ipcMain.on("create-sticky", (event, data) => {
+  // Jika sticky dengan id yang sama sudah punya window, fokuskan
+  for (const winId in activeStickies) {
+    if (activeStickies[winId].id === data.id) {
+      const win = activeStickies[winId].window;
+      if (win && !win.isDestroyed()) {
+        if (win.isMinimized()) win.restore();
+        win.focus();
+        return;
+      }
+    }
+  }
+
+  const { width: screenWidth, height: screenHeight } =
+    screen.getPrimaryDisplay().workAreaSize;
+  const stickyWin = new BrowserWindow({
+    width: 220,
+    height: 220,
+    minWidth: 150,
+    minHeight: 150,
+    frame: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: false,
+    webPreferences: {
+      preload: path.join(__dirname, "sticky-preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: true,
+      affinity: "sticky-notes",
+      spellcheck: false,
+    },
+  });
+
+  // Cegah drag & drop gambar membuka gambar seperti galeri dan me-replace window
+  stickyWin.webContents.on("will-navigate", (event) => {
+    event.preventDefault();
+  });
+
+  stickyWin.loadFile("sticky.html");
+
+  stickyWin.once("ready-to-show", () => {
+    applyStickyAlwaysOnTop(stickyWin, true);
+    stickyWin.show();
+    stickyWin.webContents.send("init-sticky-data", data);
+    stickyWin.webContents.send("sticky-pin-status-changed", true);
+  });
+
+  activeStickies[stickyWin.id] = { id: data.id, window: stickyWin };
+
+  stickyWin.on("closed", () => {
+    delete activeStickies[stickyWin.id];
+  });
+});
+
+ipcMain.on("update-sticky", (event, data) => {
+  // Broadcast update kembali ke renderer utama agar disimpan secara persisten
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("sync-sticky-update", data);
+  }
+});
+
+ipcMain.on("close-sticky", (event) => {
+  const senderWin = BrowserWindow.fromWebContents(event.sender);
+  if (senderWin && !senderWin.isDestroyed()) {
+    senderWin.close();
+  }
+});
+
+ipcMain.on("sticky-toggle-pin", (event) => {
+  const senderWin = BrowserWindow.fromWebContents(event.sender);
+  if (!senderWin || senderWin.isDestroyed()) return;
+
+  const nextPinned = !senderWin.isAlwaysOnTop();
+  applyStickyAlwaysOnTop(senderWin, nextPinned);
+  event.reply("sticky-pin-status-changed", nextPinned);
+});
+
+// ========================
 // App Events
 // ========================
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("Tododo");
+  }
+  createWindow();
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();
   }
 });
+
 app.on("activate", () => {
   if (mainWindow === null) {
     createWindow();
