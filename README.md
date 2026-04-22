@@ -3,12 +3,12 @@
 Tododo adalah aplikasi desktop manajemen tugas terpadu dengan kalender yang sangat ringan, dioptimalkan secara ketat untuk performa terbaik di Windows. Dibangun dengan Electron dan antarmuka _vanilla_ JavaScript, HTML, & CSS tanpa framework pihak ketiga yang berat.
 
 <p align="center">
-   <a href="https://github.com/hnxzl/todo-electron/releases/latest/download/Tododo%20Setup%201.0.1.exe">
+   <a href="https://drive.google.com/file/d/1auwFY2q9llzfhZSPC623NPQGayNyRzQI/view?usp=sharing">
     <img src="https://img.shields.io/badge/📥_Download_Tododo_v1.0.1_untuk_Windows-0056b3?style=for-the-badge&logo=windows&logoColor=white" alt="Download Tododo" />
   </a>
 </p>
 
-> **Catatan Download:** Tombol di atas akan langsung mengunduh installer terbaru dari release repo ini. Pastikan asset release memakai nama file `Tododo Setup 1.0.1.exe`.
+
 
 ---
 
