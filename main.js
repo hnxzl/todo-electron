@@ -362,23 +362,38 @@ ipcMain.on("sticky-toggle-pin", (event) => {
 // App Events
 // ========================
 
-app.whenReady().then(() => {
-  if (process.platform === "win32") {
-    app.setAppUserModelId("Tododo");
-  }
-  createWindow();
-});
+const gotTheLock = app.requestSingleInstanceLock();
 
-app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
-    app.quit();
-  }
-});
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on("second-instance", (event, commandLine, workingDirectory) => {
+    // Seseorang mencoba menjalankan instance kedua, kita harus fokus pada window kita.
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
 
-app.on("activate", () => {
-  if (mainWindow === null) {
+  app.whenReady().then(() => {
+    if (process.platform === "win32") {
+      app.setAppUserModelId("Tododo");
+    }
     createWindow();
-  } else {
-    showWindow();
-  }
-});
+  });
+
+  app.on("window-all-closed", () => {
+    if (process.platform !== "darwin") {
+      app.quit();
+    }
+  });
+
+  app.on("activate", () => {
+    if (mainWindow === null) {
+      createWindow();
+    } else {
+      showWindow();
+    }
+  });
+}

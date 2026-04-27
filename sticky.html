@@ -22,6 +22,12 @@
           >
             <u>U</u>
           </button>
+          <button class="sticky-btn format-btn" id="btnBullet" title="Bullet List">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+          </button>
+          <button class="sticky-btn format-btn" id="btnNumber" title="Numbered List">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="10" y1="6" x2="21" y2="6"></line><line x1="10" y1="12" x2="21" y2="12"></line><line x1="10" y1="18" x2="21" y2="18"></line><path d="M4 6h1v4"></path><path d="M4 10h2"></path><path d="M6 18H4c0-1 2-2 2-3s-1-1.5-2-1"></path></svg>
+          </button>
         </div>
         <div class="sticky-controls">
           <button class="sticky-btn" id="btnColor" title="Ubah Warna">
@@ -150,6 +156,8 @@
       const btnBold = document.getElementById("btnBold");
       const btnItalic = document.getElementById("btnItalic");
       const btnUnderline = document.getElementById("btnUnderline");
+      const btnBullet = document.getElementById("btnBullet");
+      const btnNumber = document.getElementById("btnNumber");
 
       const updateFormattingState = () => {
         try {
@@ -164,6 +172,14 @@
           btnUnderline.classList.toggle(
             "active",
             document.queryCommandState("underline"),
+          );
+          btnBullet.classList.toggle(
+            "active",
+            document.queryCommandState("insertUnorderedList"),
+          );
+          btnNumber.classList.toggle(
+            "active",
+            document.queryCommandState("insertOrderedList"),
           );
         } catch (e) {}
       };
@@ -183,12 +199,53 @@
         document.execCommand("underline", false, null);
         updateFormattingState();
       });
+      btnBullet.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand("insertUnorderedList", false, null);
+        updateFormattingState();
+      });
+      btnNumber.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        document.execCommand("insertOrderedList", false, null);
+        updateFormattingState();
+      });
 
       document.addEventListener("selectionchange", () => {
         if (document.activeElement === content) updateFormattingState();
       });
-      content.addEventListener("click", updateFormattingState);
-      content.addEventListener("keyup", updateFormattingState);
+      content.addEventListener("click", (e) => {
+        updateFormattingState();
+        if (e.target.tagName === "IMG") {
+          e.target.classList.toggle("expanded");
+        }
+      });
+      
+      content.addEventListener("keyup", (e) => {
+        updateFormattingState();
+        if (e.key === " " || e.code === "Space") {
+          const selection = window.getSelection();
+          if (!selection.rangeCount) return;
+          const node = selection.focusNode;
+          
+          if (node && node.nodeType === Node.TEXT_NODE) {
+            const text = node.textContent;
+            if (text === "1. " || text === "- " || text === "* ") {
+              const range = document.createRange();
+              range.selectNodeContents(node);
+              selection.removeAllRanges();
+              selection.addRange(range);
+              
+              document.execCommand("delete", false, null);
+              
+              if (text === "1. ") {
+                document.execCommand("insertOrderedList", false, null);
+              } else {
+                document.execCommand("insertUnorderedList", false, null);
+              }
+            }
+          }
+        }
+      });
 
       // Image Paste Handler
       content.addEventListener("paste", (e) => {
